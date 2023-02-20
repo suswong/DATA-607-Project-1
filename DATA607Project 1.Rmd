@@ -1,0 +1,139 @@
+---
+title: "DATA 607 Project 1"
+author: "Susanna Wong"
+date: "2023-02-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Read Txt File in r
+
+I read the txt file into R, and remove the rows that contains dashes.
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(DT)
+# I used the following links to see how to read txt file http://rfunction.com/archives/1441 and 
+txtfile <- readLines('https://raw.githubusercontent.com/suswong/DATA-607-Project-1/main/tournamentinfo.txt')
+table1<-read.delim(textConnection(txtfile),header=FALSE,sep="|")
+new <-table1 %>% 
+  filter(row_number() %% 3 != 1) ## Delete every 3rd row starting from 1
+datatable(new)
+#I searched how to fitler certain rows that I do not want to keep in my datatable. <https://stackoverflow.com/questions/24440258/selecting-multiple-odd-or-even-columns-rows-for-dataframe>
+```
+
+# Creating a column for USCF_ID and Rating
+
+## Create the headers of the table
+
+```{r}
+#Create headers for the datatable. I used this link: https://statisticsglobe.com/add-header-to-data-frame-in-r
+colnames(new) <- c("Pair_Num", "Player_Name", "Total_Points", "Round_1", "Round_2", "Round_3", "Round_4", "Round_5", "Round_6", "Round_7", "n/a")
+new
+
+new <- new[-1,] #Remove the 1st row
+new <- new[-1,] #Remove the 2nd row
+new <- new[,-11] #Remove the last column
+datatable(new)
+```
+
+## Create a column for the State, USCF_ID, and Rating
+
+```{r}
+#I searched how to select and extract even and odd rows using the following link. <https://datacarpentry.org/R-genomics/03-data-frames.html>
+odd <- seq(1,nrow(new),2)
+even <- seq(2,nrow(new),2)
+players <-new[odd,]
+player_state <- select(new[even,],1,2) #I used this link to see how to select certain columns https://sparkbyexamples.com/r-programming/r-select-function-from-dplyr/
+
+colnames(player_state) <- c("State", "USCF_ID.Rating")
+datatable(player_state)
+```
+
+### Spliting USCF_ID, and Rating column
+
+```{r}
+# I used the following link to split a column into multiple columns. https://www.statology.org/split-column-in-r/
+library(stringr)
+player_state[c('USCF_ID', 'Rating')] <- str_split_fixed(player_state$USCF_ID.Rating, '/ ', 2) 
+df1 <- player_state[c('State','USCF_ID', 'Rating')]
+
+df1[c('Prerating', 'Postrating')] <- str_split_fixed(df1$Rating, '->', 2) 
+df2 <- df1[c('State','USCF_ID','Prerating','Postrating')]
+df2$Prerating<-gsub("R:","",as.character(df2$Prerating)) # I used this link to help me remove "R:" in the Prerating column. https://www.tutorialspoint.com/how-to-remove-a-character-in-an-r-data-frame-column#:~:text=Side%20ProgrammingProgramming-,To%20remove%20a%20character%20in%20an%20R%20data%20frame%20column,%22%2C%22%22%2Cas.
+
+datatable(df2)
+```
+
+## Merge into one table
+
+We cannot use innerjoin or merge to combine the two tables because they do not have any common columns. We can use cbind. 
+
+```{r}
+# I search and used the following link to help me combine two tables. <https://statisticsglobe.com/cbind-r-command-example/>
+df3 <- cbind(players,df2)
+#df3 <- df3[,-1] #Remove the first column
+datatable(df3)
+
+#http://www.sthda.com/english/wiki/reordering-data-frame-columns-in-r
+```
+
+### Reorder the columns
+```{r}
+#http://www.sthda.com/english/wiki/reordering-data-frame-columns-in-r
+col_order <- c("Pair_Num","Player_Name", "State","USCF_ID","Prerating","Postrating","Total_Points", "Round_1", "Round_2", "Round_3", "Round_4", "Round_5", "Round_6", "Round_7")
+df4 <- df3[, col_order]
+datatable(df4)
+```
+
+# Find the Average Pre Chess Rating of Opponents
+```{r}
+# I search how to remove any letter from each round https://datascience.stackexchange.com/questions/15589/remove-part-of-string-in-r
+df5 <- df4[c('Pair_Num', 'Player_Name','State','Prerating','Total_Points','Round_1','Round_2','Round_3','Round_4','Round_5','Round_6','Round_7')]
+df5$Round_1<-gsub("[a-zA-Z ]","",as.character(df5$Round_1))
+df5$Round_2<-gsub("[a-zA-Z ]","",as.character(df5$Round_2))
+df5$Round_3<-gsub("[a-zA-Z ]","",as.character(df5$Round_3))
+df5$Round_4<-gsub("[a-zA-Z ]","",as.character(df5$Round_4))
+df5$Round_5<-gsub("[a-zA-Z ]","",as.character(df5$Round_5))
+df5$Round_6<-gsub("[a-zA-Z ]","",as.character(df5$Round_6))
+df5$Round_7<-gsub("[a-zA-Z ]","",as.character(df5$Round_7))
+
+datatable(df5)
+
+# I used this link. https://stackoverflow.com/questions/46057313/r-replace-values-by-row-given-some-statement-in-if-loop-with-another-value-in
+for(i in 1:nrow(df5)){
+ if(is.na(df5$Round_1[i]) == is.na(df5$Pair_Num[df5$Round_1[i]]))
+     {
+    is.na(df5$Round_1[i]) <- is.na(df5$Prerating[df5$Round_1[i]])
+  }
+}
+datatable(df5)
+
+# I found another code that help match the pair num. However, it returns NA. https://stackoverflow.com/questions/31865129/matching-and-replacing-values-in-different-columns-given-an-id-number
+# nm1 <- grep('^Round', colnames(df5))
+# df5[nm1] <- df5$Prerating[match(as.matrix(df5[nm1]), df5$Pair_Num)]
+# df5
+
+df5$Round_1 <- as.numeric(as.factor(df5$Round_1))
+df5$Round_2 <- as.numeric(as.factor(df5$Round_2))
+df5$Round_3 <- as.numeric(as.factor(df5$Round_3))
+df5$Round_4 <- as.numeric(as.factor(df5$Round_4))
+df5$Round_5 <- as.numeric(as.factor(df5$Round_5))
+df5$Round_6 <- as.numeric(as.factor(df5$Round_6))
+df5$Round_7 <- as.numeric(as.factor(df5$Round_7))
+df5$AverageRtg <- rowMeans(df5[,6:12], na.rm=TRUE)
+
+final <- df5[c('Player_Name','State','Total_Points','Prerating','AverageRtg')]
+datatable(final)
+
+```
+
+# CSV
+```{r}
+
+write.csv(final)
+```
