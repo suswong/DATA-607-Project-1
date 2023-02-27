@@ -101,30 +101,31 @@ df5$Round_4<-gsub("[a-zA-Z ]","",as.character(df5$Round_4))
 df5$Round_5<-gsub("[a-zA-Z ]","",as.character(df5$Round_5))
 df5$Round_6<-gsub("[a-zA-Z ]","",as.character(df5$Round_6))
 df5$Round_7<-gsub("[a-zA-Z ]","",as.character(df5$Round_7))
+df5$Prerating<-as.numeric(unlist(str_extract(df5$Prerating,"\\d+\\d")))
+df5$Pair_Num<-as.numeric(df5$Pair_Num)
 
 datatable(df5)
 
 # I used this link. https://stackoverflow.com/questions/46057313/r-replace-values-by-row-given-some-statement-in-if-loop-with-another-value-in
-for(i in 1:nrow(df5)){
- if(is.na(df5$Round_1[i]) == is.na(df5$Pair_Num[df5$Round_1[i]]))
-     {
-    is.na(df5$Round_1[i]) <- is.na(df5$Prerating[df5$Round_1[i]])
-  }
-}
-datatable(df5)
+
+
+
+
 
 # I found another code that help match the pair num. However, it returns NA. https://stackoverflow.com/questions/31865129/matching-and-replacing-values-in-different-columns-given-an-id-number
 # nm1 <- grep('^Round', colnames(df5))
 # df5[nm1] <- df5$Prerating[match(as.matrix(df5[nm1]), df5$Pair_Num)]
 # df5
 
-df5$Round_1 <- as.numeric(as.factor(df5$Round_1))
-df5$Round_2 <- as.numeric(as.factor(df5$Round_2))
-df5$Round_3 <- as.numeric(as.factor(df5$Round_3))
-df5$Round_4 <- as.numeric(as.factor(df5$Round_4))
-df5$Round_5 <- as.numeric(as.factor(df5$Round_5))
-df5$Round_6 <- as.numeric(as.factor(df5$Round_6))
-df5$Round_7 <- as.numeric(as.factor(df5$Round_7))
+
+df6 <- df5[c('Pair_Num','Prerating')]
+df5$Round_1 <- df6$Prerating[match(df5$Round_1,df6$Pair_Num)]
+df5$Round_2 <- df6$Prerating[match(df5$Round_2,df6$Pair_Num)]
+df5$Round_3 <- df6$Prerating[match(df5$Round_3,df6$Pair_Num)]
+df5$Round_4 <- df6$Prerating[match(df5$Round_4,df6$Pair_Num)]
+df5$Round_5 <- df6$Prerating[match(df5$Round_5,df6$Pair_Num)]
+df5$Round_6 <- df6$Prerating[match(df5$Round_6,df6$Pair_Num)]
+df5$Round_7 <- df6$Prerating[match(df5$Round_7,df6$Pair_Num)]
 df5$AverageRtg <- rowMeans(df5[,6:12], na.rm=TRUE)
 
 final <- df5[c('Player_Name','State','Total_Points','Prerating','AverageRtg')]
