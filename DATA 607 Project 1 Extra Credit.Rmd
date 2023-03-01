@@ -1,0 +1,277 @@
+---
+title: "DATA 607 Project 1 Extra Credit"
+author: "Susanna Wong"
+date: "2023-02-28"
+output: 
+  html_document:
+    code_folding: hide
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+In project 1, we were given a text file with chess tournament results. The goal of the project was to tidy the data in r, calculate the average pre chess rating of opponents, and generate a .CSV file. In this extra credit assignment, we identify the top 5 over performers and under performers by comparing the player's actual score and their calculated expected score.
+
+# Project 1
+
+## Load Text File into R
+
+In project 1, I loaded the text file into R. Below is the table of the text file. The table has the following issues:
+
+1\. There are dashes and empty rows and column.
+
+2\. Each player's information are within every two rows.
+
+2\. The 'Player names', 'USCF ID', 'Pre-Rating' and 'Post-Rating' are in every 2 rows of the 2nd column.
+
+3\. There are no header.
+
+4\. Every cell contains both numeric and non-meric values.
+
+```{r,  message=FALSE, warning=FALSE}
+#library(dplyr)
+library(tidyverse)
+library(tidyr)
+library(DT)
+# I used the following links to see how to read txt file http://rfunction.com/archives/1441 and 
+txtfile <- readLines('https://raw.githubusercontent.com/suswong/DATA-607-Project-1/main/tournamentinfo.txt')
+table1<-read.delim(textConnection(txtfile),header=FALSE,sep="|")
+datatable(table1)
+```
+
+## Tidy Data
+
+Below is a table of the tidied data. Below are the steps I took to tidy the data:
+
+1.  Remove the empty rows that were between each player information and the last empty column.
+2.  Remove the "header" row and created a header row for the columns.
+3.  Create a column for the 'Player names', 'USCF ID', 'Pre-Rating' and 'Post-Rating'
+
+```{r, Tidying the data, message=FALSE}
+new <-table1 %>% 
+  filter(row_number() %% 3 != 1) ## Delete every 3rd row starting from 1
+#I searched how to fitler certain rows that I do not want to keep in my datatable. <https://stackoverflow.com/questions/24440258/selecting-multiple-odd-or-even-columns-rows-for-dataframe>
+
+colnames(new) <- c("Pair_Num", "Player_Name", "Total_Points", "Round_1", "Round_2", "Round_3", "Round_4", "Round_5", "Round_6", "Round_7", "n/a")
+
+
+new <- new[-1,] #Remove the 1st row
+new <- new[-1,] #Remove the 2nd row
+new <- new[,-11] #Remove the last column
+
+#I searched how to select and extract even and odd rows using the following link. <https://datacarpentry.org/R-genomics/03-data-frames.html>
+odd <- seq(1,nrow(new),2)
+even <- seq(2,nrow(new),2)
+players <-new[odd,]
+player_state <- select(new[even,],1,2) #I used this link to see how to select certain columns https://sparkbyexamples.com/r-programming/r-select-function-from-dplyr/
+
+colnames(player_state) <- c("State", "USCF_ID.Rating")
+
+# I used the following link to split a column into multiple columns. https://www.statology.org/split-column-in-r/
+library(stringr)
+player_state[c('USCF_ID', 'Rating')] <- str_split_fixed(player_state$USCF_ID.Rating, '/ ', 2) 
+df1 <- player_state[c('State','USCF_ID', 'Rating')]
+
+df1[c('Prerating', 'Postrating')] <- str_split_fixed(df1$Rating, '->', 2) 
+df2 <- df1[c('State','USCF_ID','Prerating','Postrating')]
+df2$Prerating<-gsub("R:","",as.character(df2$Prerating)) # I used this link to help me remove "R:" in the Prerating column. https://www.tutorialspoint.com/how-to-remove-a-character-in-an-r-data-frame-column#:~:text=Side%20ProgrammingProgramming-,To%20remove%20a%20character%20in%20an%20R%20data%20frame%20column,%22%2C%22%22%2Cas.
+
+# I search and used the following link to help me combine two tables. <https://statisticsglobe.com/cbind-r-command-example/>
+df3 <- cbind(players,df2)
+#df3 <- df3[,-1] #Remove the first column
+
+#http://www.sthda.com/english/wiki/reordering-data-frame-columns-in-r
+col_order <- c("Pair_Num","Player_Name", "State","USCF_ID","Prerating","Postrating","Total_Points", "Round_1", "Round_2", "Round_3", "Round_4", "Round_5", "Round_6", "Round_7")
+df4 <- df3[, col_order]
+
+# I search how to remove any letter from each round https://datascience.stackexchange.com/questions/15589/remove-part-of-string-in-r
+df5 <- df4[c('Pair_Num', 'Player_Name','State','Prerating','Total_Points','Round_1','Round_2','Round_3','Round_4','Round_5','Round_6','Round_7')]
+df5$Round_1<-gsub("[a-zA-Z ]","",as.character(df5$Round_1))
+df5$Round_2<-gsub("[a-zA-Z ]","",as.character(df5$Round_2))
+df5$Round_3<-gsub("[a-zA-Z ]","",as.character(df5$Round_3))
+df5$Round_4<-gsub("[a-zA-Z ]","",as.character(df5$Round_4))
+df5$Round_5<-gsub("[a-zA-Z ]","",as.character(df5$Round_5))
+df5$Round_6<-gsub("[a-zA-Z ]","",as.character(df5$Round_6))
+df5$Round_7<-gsub("[a-zA-Z ]","",as.character(df5$Round_7))
+df5$Prerating<-as.numeric(unlist(str_extract(df5$Prerating,"\\d+\\d")))
+df5$Pair_Num<-as.numeric(df5$Pair_Num)
+
+Final <- df5
+
+
+Tidied_Table <- df4
+Tidied_Table$Prerating<-as.numeric(unlist(str_extract(df5$Prerating,"\\d+\\d")))
+Tidied_Table$Postrating<-as.numeric(unlist(str_extract(df5$Prerating,"\\d+\\d")))
+
+colnames(Tidied_Table) <- c("Player Number", "Player Name", "State","USCF_ID", "Pre-Rating","Post-Rating","Total Points", "Round 1", "Round 2", "Round 3", "Round 4", "Round 5", "Round 6", "Round 7")
+
+rownames(Tidied_Table) <- NULL
+
+library(kableExtra)
+kbl(Tidied_Table) %>%
+  kable_classic() %>%
+  add_header_above(c("Player Information" = 7 , "Opponent Player Number for Each Round" = 7))
+```
+
+## Calculate the Average Pre-Rating of Opponents for Each Player
+
+In order to find the average pre-rating of opponents for each player, Ineed to remove the status (W, L, or D) in each round. Then, match and replace each opponent player number with their pre-rating number for each round. The average pre-rating of opponents for each player is the sum of all the opponents' pre-rating divided by the total number of games played.
+
+```{r,  message=FALSE}
+df6 <- df5[c('Pair_Num','Prerating')]
+df5$Round_1 <- df6$Prerating[match(df5$Round_1,df6$Pair_Num)]
+df5$Round_2 <- df6$Prerating[match(df5$Round_2,df6$Pair_Num)]
+df5$Round_3 <- df6$Prerating[match(df5$Round_3,df6$Pair_Num)]
+df5$Round_4 <- df6$Prerating[match(df5$Round_4,df6$Pair_Num)]
+df5$Round_5 <- df6$Prerating[match(df5$Round_5,df6$Pair_Num)]
+df5$Round_6 <- df6$Prerating[match(df5$Round_6,df6$Pair_Num)]
+df5$Round_7 <- df6$Prerating[match(df5$Round_7,df6$Pair_Num)]
+df5$AverageRtg <- round(rowMeans(df5[,6:12], na.rm=TRUE))
+
+Average <- df5
+colnames(Average) <- c("Player Number", "Player Name", "State", "Pre-Rating","Total Points", "Opponent 1", "Opponent 2", "Opponent 3", "Opponent 4", "Opponent 5", "Opponent 6", "Opponent 7", "Average Pre-Rating of Opponents")
+
+rownames(Average) <- NULL
+
+kbl(Average) %>%
+  kable_classic() %>%
+  add_header_above(c("Player Information" = 5 , "Opponent Pre-Rating for Each Round" = 8))
+```
+
+# Calculate the Expected Score of Each Player
+
+The formula to calculate the expected score of each player was found in href="<https://en.wikipedia.org/wiki/Elo_rating_system#Theory>"\> Wikipedia</a>.
+
+The expected score of a player is $$E_A=\frac{1}{1+10^{\frac{R_B-R_A}{400}}}$$ where $$R_A$$ stands for the player's pre-rating and $$R_B$$ stands for the opponent's pre-rating.
+
+The difference of the actual score and expected score is 'Total Points'-'Expected Score'.
+
+Below is a plot graph of the actual score and the expected score of each player.
+
+```{r,  message=FALSE}
+# Expected <- Rating
+
+# Expected$Round_1 <- 1/(1+10^(((as.numeric(Expected$Round_1))-(as.numeric(Expected$Total_Points)))/400))
+# Expected$Round_2 <- 1/(1+10^(((as.numeric(Expected$Round_2))-(as.numeric(Expected$Total_Points)))/400))
+# Expected$Round_3 <- 1/(1+10^(((as.numeric(Expected$Round_3))-(as.numeric(Expected$Total_Points)))/400))
+# Expected$Round_4 <- 1/(1+10^(((as.numeric(Expected$Round_4))-(as.numeric(Expected$Total_Points)))/400))
+# Expected$Round_5 <- 1/(1+10^(((as.numeric(Expected$Round_5))-(as.numeric(Expected$Total_Points)))/400))
+# Expected$Round_6 <- 1/(1+10^(((as.numeric(Expected$Round_6))-(as.numeric(Expected$Total_Points)))/400))
+# Expected$Round_7 <- 1/(1+10^(((as.numeric(Expected$Round_7))-(as.numeric(Expected$Total_Points)))/400))
+# 
+# Expected$Round_1 <- 1/(1+10^(((as.numeric(Expected$Total_Points))-(as.numeric(Expected$Round_1)))/400))
+# Expected$Round_2 <- 1/(1+10^(((as.numeric(Expected$Total_Points))-(as.numeric(Expected$Round_2)))/400))
+# Expected$Round_3 <- 1/(1+10^(((as.numeric(Expected$Total_Points))-(as.numeric(Expected$Round_3)))/400))
+# Expected$Round_4 <- 1/(1+10^(((as.numeric(Expected$Total_Points))-(as.numeric(Expected$Round_3)))/400))
+# Expected$Round_5 <- 1/(1+10^(((as.numeric(Expected$Total_Points))-(as.numeric(Expected$Round_4)))/400))
+# Expected$Round_6 <- 1/(1+10^(((as.numeric(Expected$Total_Points))-(as.numeric(Expected$Round_5)))/400))
+# Expected$Round_7 <- 1/(1+10^(((as.numeric(Expected$Total_Points))-(as.numeric(Expected$Round_6)))/400))
+
+Expected <- df5[c('Pair_Num', 'Player_Name','State','Prerating','Total_Points','Round_1','Round_2','Round_3','Round_4','Round_5','Round_6','Round_7')]
+Expected$Round_1 <- 1/(1+10^(((as.numeric(Expected$Round_1))-(as.numeric(Expected$Prerating)))/400))
+Expected$Round_2 <- 1/(1+10^(((as.numeric(Expected$Round_2))-(as.numeric(Expected$Prerating)))/400))
+Expected$Round_3 <- 1/(1+10^(((as.numeric(Expected$Round_3))-(as.numeric(Expected$Prerating)))/400))
+Expected$Round_4 <- 1/(1+10^(((as.numeric(Expected$Round_4))-(as.numeric(Expected$Prerating)))/400))
+Expected$Round_5 <- 1/(1+10^(((as.numeric(Expected$Round_5))-(as.numeric(Expected$Prerating)))/400))
+Expected$Round_6 <- 1/(1+10^(((as.numeric(Expected$Round_6))-(as.numeric(Expected$Prerating)))/400))
+Expected$Round_7 <- 1/(1+10^(((as.numeric(Expected$Round_7))-(as.numeric(Expected$Prerating)))/400))
+
+Expected$Expected_Score <- round(rowSums(Expected[,6:12], na.rm=TRUE), digits = 2)
+Expected$Difference <- round((as.numeric(Expected$Total_Points))-(as.numeric(Expected$Expected_Score)), digits = 2)
+
+
+ggplot(data = Expected, aes(x=Expected_Score, y=Total_Points, color=State)) + geom_point()
+```
+
+Below is a table of the expected score for each player.
+
+```{r,  message=FALSE}
+Expected$Round_1 <- round(as.numeric(Expected$Round_1), digits=2)
+Expected$Round_2 <- round(as.numeric(Expected$Round_2), digits=2)
+Expected$Round_3 <- round(as.numeric(Expected$Round_3), digits=2)
+Expected$Round_4 <- round(as.numeric(Expected$Round_4), digits=2)
+Expected$Round_5 <- round(as.numeric(Expected$Round_5), digits=2)
+Expected$Round_6 <- round(as.numeric(Expected$Round_6), digits=2)
+Expected$Round_7 <- round(as.numeric(Expected$Round_7), digits=2)
+
+Expected$Positive_Difference <-abs(Expected$Difference)
+
+Expected$Relative_Percentage_Difference <- (as.numeric(Expected$Difference))/(as.numeric(Expected$Expected_Score))
+
+Expected$Relative_Percentage_Difference <- round(as.numeric(Expected$Relative_Percentage_Difference), digits=2)
+
+
+
+
+colnames(Expected) <- c("Player Number", "Player Name", "State", "Pre-Rating","Total Points", "Opponent 1", "Opponent 2", "Opponent 3", "Opponent 4", "Opponent 5", "Opponent 6", "Opponent 7", "Expected Score","Difference", "Positive Difference", "Relative Percentage Difference")
+
+rownames(Expected) <- NULL
+datatable(Expected)
+```
+
+# Over Performers
+
+Over performers are players who have a total score greater than their expected score. I can determine which player is a over performer by viewing their difference from their actual score. If the player's difference is positive, then they are an over performer. Below is a table of the over performers. 56% of the players were over performers.
+
+```{r,  message=FALSE}
+Overperformer <- Expected%>%
+  filter(Difference >0)
+
+Overperformer <- Overperformer[c('Player Name','State','Pre-Rating','Total Points','Expected Score','Difference','Positive Difference','Relative Percentage Difference')]
+datatable(Overperformer)
+
+library(scales)
+Percentage_of_Overperformers <- percent(nrow(Overperformer)/nrow(Expected))
+Percentage_of_Overperformers
+```
+
+## Top 5 Over Performers
+
+Below are the top 5 over performers.
+
+```{r,  message=FALSE}
+Top_Five <- Overperformer%>%
+  filter(rank(desc(Difference)) <=5)
+Top_Five <- Top_Five[c('Player Name','State','Pre-Rating','Total Points','Expected Score','Difference','Positive Difference','Relative Percentage Difference')]
+datatable(Top_Five)
+```
+
+# Under Performers
+
+Under performers are players who have a total score less than their expected score. If the player's difference is negative, then they are an over performer.
+
+Below is a table of the over performers. 44% of the players were under performers.
+
+```{r,  message=FALSE}
+Underperformer <- Expected%>%
+  filter(Difference <0)%>%
+  arrange(Difference)
+
+Underperformer <- Underperformer[c('Player Name','State','Pre-Rating','Total Points','Expected Score','Difference','Relative Percentage Difference')]
+
+datatable(Underperformer)
+Percentage_of_Underperformers <- percent(nrow(Underperformer)/nrow(Expected))
+Percentage_of_Underperformers
+```
+
+## Top 5 Underperformers
+
+Below are the top 5 under performers.
+
+```{r}
+Bottom_Five <- Underperformer[1:5,]
+Bottom_Five <- Bottom_Five[c('Player Name','State','Pre-Rating','Total Points','Expected Score','Difference','Relative Percentage Difference')]
+datatable(Bottom_Five)
+```
+
+# Conclusion
+
+56% of the players were over performers and 44% of the players were under performers.
+
+The top 5 over performers were: 1. ADITYA BAJAJ 2. ANVIT RAO 3. ZACHARY JAMES HOUGHTON 4. AMIYATOSH PWNANANDAM 5. JACOB ALEXANDER LAVALLEY
+
+The top 5 performers were: 1. LOREN SCHWIEBERT 2. GEORGE AVERY JONES 3. JARED GE 4. RISHI SHETTY 5. JOSHUA DAVID LEE
